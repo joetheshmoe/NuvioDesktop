@@ -1,4 +1,4 @@
-rootProject.name = "Nuvio"
+rootProject.name = "NuvioDesktop"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {

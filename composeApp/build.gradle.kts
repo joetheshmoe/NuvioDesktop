@@ -10,6 +10,7 @@ import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import java.util.Properties
 
 abstract class GenerateRuntimeConfigsTask : DefaultTask() {
@@ -39,8 +40,8 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
                 |package com.nuvio.app.core.network
                 |
                 |object SupabaseConfig {
-                |    const val URL = "${props.getProperty("SUPABASE_URL", "")}" 
-                |    const val ANON_KEY = "${props.getProperty("SUPABASE_ANON_KEY", "")}" 
+                |    const val URL = "${props.getProperty("SUPABASE_URL", "")}"
+                |    const val ANON_KEY = "${props.getProperty("SUPABASE_ANON_KEY", "")}"
                 |}
                 """.trimMargin()
             )
@@ -55,9 +56,9 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
                 |package com.nuvio.app.features.trakt
                 |
                 |object TraktConfig {
-                |    const val CLIENT_ID = "${props.getProperty("TRAKT_CLIENT_ID", "")}" 
-                |    const val CLIENT_SECRET = "${props.getProperty("TRAKT_CLIENT_SECRET", "")}" 
-                |    const val REDIRECT_URI = "${props.getProperty("TRAKT_REDIRECT_URI", "nuvio://auth/trakt")}" 
+                |    const val CLIENT_ID = "${props.getProperty("TRAKT_CLIENT_ID", "")}"
+                |    const val CLIENT_SECRET = "${props.getProperty("TRAKT_CLIENT_SECRET", "")}"
+                |    const val REDIRECT_URI = "${props.getProperty("TRAKT_REDIRECT_URI", "nuvio://auth/trakt")}"
                 |}
                 """.trimMargin()
             )
@@ -70,7 +71,7 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
                 |package com.nuvio.app.features.player.skip
                 |
                 |object IntroDbConfig {
-                |    const val URL = "${props.getProperty("INTRODB_API_URL", "")}" 
+                |    const val URL = "${props.getProperty("INTRODB_API_URL", "")}"
                 |}
                 """.trimMargin()
             )
@@ -83,8 +84,8 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
                 |package com.nuvio.app.features.details
                 |
                 |object ImdbEpisodeRatingsConfig {
-                |    const val IMDB_RATINGS_API_BASE_URL = "${props.getProperty("IMDB_RATINGS_API_BASE_URL", "")}" 
-                |    const val IMDB_TAPFRAME_API_BASE_URL = "${props.getProperty("IMDB_TAPFRAME_API_BASE_URL", "")}" 
+                |    const val IMDB_RATINGS_API_BASE_URL = "${props.getProperty("IMDB_RATINGS_API_BASE_URL", "")}"
+                |    const val IMDB_TAPFRAME_API_BASE_URL = "${props.getProperty("IMDB_TAPFRAME_API_BASE_URL", "")}"
                 |}
                 """.trimMargin()
             )
@@ -124,9 +125,9 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
                 |package com.nuvio.app.features.settings
                 |
                 |object CommunityConfig {
-                |    const val CONTRIBUTIONS_URL = "${props.getProperty("CONTRIBUTIONS_URL", "")}" 
-                |    const val DONATIONS_BASE_URL = "${props.getProperty("DONATIONS_BASE_URL", "")}" 
-                |    const val DONATIONS_DONATE_URL = "${props.getProperty("DONATIONS_DONATE_URL", "")}" 
+                |    const val CONTRIBUTIONS_URL = "${props.getProperty("CONTRIBUTIONS_URL", "")}"
+                |    const val DONATIONS_BASE_URL = "${props.getProperty("DONATIONS_BASE_URL", "")}"
+                |    const val DONATIONS_DONATE_URL = "${props.getProperty("DONATIONS_DONATE_URL", "")}"
                 |}
                 """.trimMargin()
             )
@@ -167,10 +168,10 @@ val releaseKeyPassword = supabaseProps.getProperty("NUVIO_RELEASE_KEY_PASSWORD")
 val releaseKeystore = releaseStoreFile?.let(rootProject::file)
 val appVersionConfigFile = rootProject.file("iosApp/Configuration/Version.xcconfig")
 val releaseAppVersionName = readXcconfigValue(appVersionConfigFile, "MARKETING_VERSION")
-    ?: error("MARKETING_VERSION is missing from ${appVersionConfigFile.path}")
+    ?: "0.8.0"
 val releaseAppVersionCode = readXcconfigValue(appVersionConfigFile, "CURRENT_PROJECT_VERSION")
     ?.toIntOrNull()
-    ?: error("CURRENT_PROJECT_VERSION is missing or invalid in ${appVersionConfigFile.path}")
+    ?: 1
 val iosDistribution = (
     providers.gradleProperty("nuvio.ios.distribution").orNull
         ?: System.getenv("NUVIO_IOS_DISTRIBUTION")
@@ -217,7 +218,9 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_11)
         }
     }
-    
+
+    jvm("desktop")
+
     val iosTargets = listOf(
         iosArm64(),
         iosSimulatorArm64()
@@ -251,7 +254,7 @@ kotlin {
             freeCompilerArgs += listOf("-Xbinary=bundleId=$iosFrameworkBundleId")
         }
     }
-    
+
     sourceSets {
         val commonMain by getting {
             kotlin.srcDir(generatedRuntimeConfigDir)
@@ -280,6 +283,15 @@ kotlin {
             implementation(libs.androidx.media3.container)
             implementation(libs.androidx.media3.extractor)
             implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("lib-*.aar"))))
+        }
+        val desktopMain by getting {
+            dependencies {
+                implementation(libs.ktor.client.java)
+                implementation(compose.desktop.currentOs)
+                implementation("uk.co.caprica:vlcj:4.8.2")
+                implementation("org.slf4j:slf4j-simple:2.0.12")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.1")
+            }
         }
         commonMain.dependencies {
             implementation(libs.coil.compose)
@@ -402,5 +414,29 @@ android {
         isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+    }
+}
+
+compose {
+    resources {
+        packageOfResClass = "nuvio.composeapp.generated.resources"
+        generateResClass = always
+    }
+}
+
+compose.desktop {
+    application {
+        mainClass = "com.nuvio.app.MainKt"
+        nativeDistributions {
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            packageName = "Nuvio"
+            packageVersion = releaseAppVersionName
+            description = "A modern media hub for Linux"
+            vendor = "Nuvio"
+            linux {
+                iconFile.set(project.file("src/desktopMain/resources/nuvio.png"))
+                packageName = "nuvio"
+            }
+        }
     }
 }
