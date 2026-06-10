@@ -7,6 +7,7 @@
   [![License][license-shield]][license-url]
 
   <p>
+    *DOES NOT WORK YET- HTTP requests and media playback not yet implemented*
     A modern media hub for Linux (and beyond) built with Kotlin Multiplatform and Compose Multiplatform.
     <br />
     Stremio addon ecosystem • Desktop-first
